@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">FrequencyRecord</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="action_settings">Settings</string>
+    <string name="frequency_Default">0.0 Hz</string>
+	<string name="curr_freq_view">Current Peak Frequency</string>
+	<string name="toggle_off"> Start Record </string>
+	<string name="toggle_on"> End Record </string>
+	<string name="sampling_rate_view"> Sampling Rate </string>
+	<string name="NFFT_view"> NFFT </string>
+	<string name="delta_frequency_desc_view"> Fs/NFFT (Hz/col) </string>
+	<string name="delta_frequency_detail_view"> 31.25 </string>
+	<string name="output_info_desc_view"> Number of Columns </string>
+	<string name="output_info_detail_view"> 128 </string>
+    <string name="noise_filter_view"> Noise Filter </string>
+    <string name="noise_filter_value_view"> 0 dB </string>
+    <string name="curr_noise_desc_view"> Current Noise Level </string>
+	<string name="curr_noise_detail_view"> 0 dB </string>
+	<string name="settings_text_button">Settings</string>
+	<string name="filters_text_button">Filters</string>
+	<string name="curr_threshold_view">Current Noise Cutoff</string>
+	<string name="curr_threshold_detail_view"> 0 dB </string>
+	<string name="graph_max_value_title"> dB Range on Graph </string>
+	<string name="graph_max_value_detail"> 0 dB to 30 dB </string>
+	<string name="raw_graph_toggle_text"> Raw Data Display </string>
+	<string name="bandpass_filter_text"> Bandpass Filter </string>
+	<string name="point_average_filter"> X-Point Average Filter </string>
+	<string name="point_average_filter_lower_text_view"> Lower Bound </string>
+	<string name="point_average_filter_upper_text_view"> Upper Bound </string>
+	<string name="lower_default"> 0 </string>
+	<string name="upper_default"> 4000 </string>
+    
+	
+	<string-array name="frequency_array">
+        <item>8000 Hz</item>
+        <item>11025 Hz</item>
+        <item>16000 Hz</item>
+        <item>22050 Hz</item>
+        <item>44100 Hz</item>
+    </string-array>
+    
+	<string-array name="NFFT_array">
+        <item>128</item>
+        <item>256</item>
+        <item>512</item>
+    </string-array>
+    
+	<string-array name="point_average_array">
+	    <item>1</item>
+        <item>3</item>
+        <item>5</item>
+        <item>7</item>
+    </string-array>
+	
+</resources>
