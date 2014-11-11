@@ -5,9 +5,14 @@ import android.support.v7.app.ActionBarActivity;
 import android.support.v4.app.DialogFragment;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
+import android.text.InputType;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
+import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.res.TypedArray;
 import android.graphics.Color;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
@@ -22,9 +27,14 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CompoundButton;
+import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
@@ -34,24 +44,76 @@ import jxl.write.Number;
 import jxl.write.biff.RowsExceededException;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.StreamCorruptedException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 
 import com.jjoe64.graphview.BarGraphView;
 import com.jjoe64.graphview.GraphView.LegendAlign;
 import com.jjoe64.graphview.GraphViewSeries;
 import com.jjoe64.graphview.GraphView.GraphViewData;
 
-public class MainActivity extends ActionBarActivity {
+public class MainActivity extends BaseActivity {
+	public static boolean displayRaw;
+	public PlaceholderFragment fragment;
+	
+	private static final int CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO;
+	private static final int AUDIO_ENCODING = AudioFormat.ENCODING_PCM_16BIT;
+	private static final int ROW_DEFAULT = 2;
+	private static int REFRESH_RATE = 5;
+	private static final int REQUEST_SETTINGS = 3208;
+	private static final int REQUEST_FILTERS = 2508;
+	
+	private static int refreshIndex;
+	private static RealDoubleFFT transformer;
+	private static int sample_frequency;
+	private static int blockSize;
+	private static double noiseLevel;
+	private static double threshold;
+	private static double graphRange;
+	private static double currPeakFreq;
+	private static boolean graphNeedReset;
+	
+	public static ArrayList<FreqRead> currTargetFreq;
+	
+	private static int averagePoint;
+	private static boolean bandpassEnabled;
+	private static double bandpassLow;
+	private static double bandpassHigh;
+	private static boolean bandPassReset;
+	
+	private static boolean excelWriteFlag;
+	
+	static boolean started;
+	static double initTime;
+	
+	private String[] navMenuTitles;
+	private TypedArray navMenuIcons;
+	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		setContentView(R.layout.activity_main);
+		setContentView(R.layout.drawer);
+		
+		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+		
+		navMenuTitles = getResources().getStringArray(R.array.nav_drawer_items); // load titles from strings.xml
+		navMenuIcons = getResources().obtainTypedArray(R.array.nav_drawer_icons);//load icons from strings.xml
+		
+		set(navMenuTitles,navMenuIcons);
 		
 		if (savedInstanceState == null) {
+			fragment = new PlaceholderFragment();
 			getSupportFragmentManager().beginTransaction()
-					.add(R.id.container, new PlaceholderFragment()).commit();
+					.add(R.id.content_frame, fragment).commit();
 		}
 	}
 	
@@ -79,46 +141,20 @@ public class MainActivity extends ActionBarActivity {
 	 * A placeholder fragment containing a simple view.
 	 */
 	public static class PlaceholderFragment extends Fragment {
-		private final int CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO;
-		private final int AUDIO_ENCODING = AudioFormat.ENCODING_PCM_16BIT;
-		private final int ROW_DEFAULT = 2;
-		private int REFRESH_RATE = 5;
-		private final int REQUEST_SETTINGS = 3208;
-		private final int REQUEST_FILTERS = 2508;
-		
-		private int refreshIndex;
-		private RealDoubleFFT transformer;
-		private int sample_frequency;
-		private int blockSize;
-		private double noiseLevel;
-		private double threshold;
-		private double graphRange;
-		private boolean displayRaw;
-		private boolean graphNeedReset;
-		
-		private int averagePoint;
-		private boolean bandpassEnabled;
-		private double bandpassLow;
-		private double bandpassHigh;
-		private boolean bandPassReset;
-		
-		boolean started;
-		double initTime;
-		
 		int row = ROW_DEFAULT;
 		
 		RecordAudio recorder;
 		
 		TextView frequencyView;
 		ToggleButton toggleButton;
+		Button freqMarkButton;
 		TextView deltaFreqView;
 		TextView numColView;
 		TextView currNoiseView;
 		TextView currThresholdView;
 		LinearLayout graphLayout;
-		
-		Button settingsButton;
-		Button filtersButton;
+		ListView targetCheckListView;
+		public static FreqReadAdapter adapter;
 		
 		WritableWorkbook workbook;
 		WritableSheet currSheet;
@@ -215,6 +251,54 @@ public class MainActivity extends ActionBarActivity {
 	        		rawData[i] = new GraphViewData(currFreq,toTransform[0][i]);
 	        	}
 	        	
+	        	//TODO
+	        	if (currTargetFreq != null && currTargetFreq.size() != 0){
+	        		HashMap<Integer, FreqRead> dict = new HashMap<Integer,FreqRead>();
+	        		for (int j=0; j<currTargetFreq.size(); j++){
+	        			FreqRead current = currTargetFreq.get(j);
+	        			current.flag = 2;
+	        			int targetIndex = (int)current.frequencyValue / (int)((1.0*sample_frequency)/(2.0*blockSize));
+	        			dict.put(targetIndex, current);
+	        		}
+	        		ArrayList<Integer> localMax = new ArrayList<Integer>();
+	        		double currMax = 0;
+	        		int counter = 0;
+	        		for (int i=0; i<filterData.length-5; i++){
+	        			if (filterData[i] < 0.5 || filterData[i] < noiseLevel){
+	        				continue;
+	        			}
+	        			if (currMax < filterData[i]){
+	        				currMax = filterData[i];
+	        			} else{
+	        				if (counter == 2){
+	        					counter = 0;
+	        					localMax.add(i);
+	        					Log.e("wtf"+ i, "jomg");
+	        					while (currMax > filterData[i] || currMax > filterData[i+1] && i<filterData.length-5){
+	        						currMax = filterData[i];
+	        						i++;
+	        					}
+	        				}else{
+	        					counter ++;
+	        				}
+	        			}
+		        	}
+	        		
+	        		for (int i=0; i<localMax.size(); i++){
+	        			for (int j=-6; j<7; j++){
+	        				if (dict.keySet().contains(localMax.get(i)+j)){
+	        					if (Math.abs(j) <= 3){
+		        					dict.get(localMax.get(i)+j).flag = 0;
+		        				}else{
+		        					dict.get(localMax.get(i)+j).flag = 1;
+		        				}
+	        				}
+	        			}
+	        		}
+	        		adapter.notifyDataSetChanged();
+	        	}
+	        	
+	        	
 	        	if (series == null)
 	        		series = new GraphViewSeries("Filtered",new GraphViewSeries.GraphViewSeriesStyle(Color.BLUE, 10),graphData);
 	        	if (rawSeries == null && displayRaw)
@@ -236,9 +320,9 @@ public class MainActivity extends ActionBarActivity {
 	        	if (max < threshold) //Ignore low decibel values
 	        		return;
 	        	
-	        	double freq = (1.0*sample_frequency)/(2.0*blockSize) * index;
+	        	currPeakFreq = (1.0*sample_frequency)/(2.0*blockSize) * index;
 	        	
-	        	frequencyView.setText(Double.toString(freq) + " Hz");
+	        	frequencyView.setText(Double.toString(currPeakFreq) + " Hz");
 	        }
 	        
 	        public void retire(){
@@ -262,6 +346,7 @@ public class MainActivity extends ActionBarActivity {
 			bandpassLow = 0;
 			bandpassHigh = sample_frequency/2;
 			bandPassReset = false;
+			excelWriteFlag = false;
 		}
 		
 		private WritableSheet createSheet(WritableWorkbook wb, String sheetName, int sheetIndex){
@@ -314,6 +399,32 @@ public class MainActivity extends ActionBarActivity {
 			graphView.setLegendAlign(LegendAlign.TOP);
 			graphLayout.addView(graphView);
 			
+			File savedata = new File(getActivity().getApplicationContext().getFilesDir() + "/SaveData/freqreads.txt");
+			currTargetFreq = null;
+			
+			if (savedata.exists()){
+				ObjectInputStream inputStream;
+				try {
+					inputStream = new ObjectInputStream(new FileInputStream(savedata));
+					
+					currTargetFreq = (ArrayList<FreqRead>)inputStream.readObject();
+				} catch (StreamCorruptedException e) {
+					e.printStackTrace();
+				} catch (FileNotFoundException e) {
+					e.printStackTrace();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}catch (ClassNotFoundException e) {
+					e.printStackTrace();
+				}
+			} else{
+				currTargetFreq = new ArrayList<FreqRead>(); //Empty ArrayList
+			}
+			
+			targetCheckListView = (ListView) rootView.findViewById(R.id.frequencyListView);
+			adapter = new FreqReadAdapter(currTargetFreq);
+			targetCheckListView.setAdapter(adapter);
+			
 			toggleButton = (ToggleButton) rootView.findViewById(R.id.recordToggleButton);
 			toggleButton.setChecked(false);
 			toggleButton.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
@@ -342,8 +453,7 @@ public class MainActivity extends ActionBarActivity {
 						currSheet = createSheet(workbook, "First Sheet", 0);
 						
 						formatSpreadsheet (fileName);
-						settingsButton.setEnabled(false);
-						filtersButton.setEnabled(false);
+						excelWriteFlag = true;
 						
 						initTime = System.currentTimeMillis()/1000.0;
 					}
@@ -359,42 +469,87 @@ public class MainActivity extends ActionBarActivity {
 							Log.d("JAJA!",getActivity().getFilesDir().getAbsolutePath()+"/"+fileName);
 						}
 						row = ROW_DEFAULT;
-						settingsButton.setEnabled(true);
-						filtersButton.setEnabled(true);
+						excelWriteFlag = false;
 					}
 				}
 			});
 		
+			freqMarkButton = (Button) rootView.findViewById(R.id.frequencyRecordButton);
+			freqMarkButton.setOnClickListener(new OnClickListener(){
+				@Override
+				public void onClick(View v) {
+					Context c = PlaceholderFragment.this.getActivity();
+					AlertDialog.Builder builder = new AlertDialog.Builder(c);
+					builder.setTitle("Frequency Name");
+					
+					final double currFreqVal = currPeakFreq;
+					final EditText input = new EditText(c);
+					input.setInputType(InputType.TYPE_CLASS_TEXT);
+					builder.setView(input);
+					
+					builder.setPositiveButton("OK", new DialogInterface.OnClickListener() { 
+					    @Override
+					    public void onClick(DialogInterface dialog, int which) {
+					    	File savedata = new File(getActivity().getApplicationContext().getFilesDir() + "/SaveData/freqreads.txt");
+							ArrayList<FreqRead> freqreads = null;
+							
+							if (savedata.exists()){
+								ObjectInputStream inputStream;
+								try {
+									inputStream = new ObjectInputStream(new FileInputStream(savedata));
+									
+									freqreads = (ArrayList<FreqRead>)inputStream.readObject();
+								} catch (StreamCorruptedException e) {
+									e.printStackTrace();
+								} catch (FileNotFoundException e) {
+									e.printStackTrace();
+								} catch (IOException e) {
+									e.printStackTrace();
+								}catch (ClassNotFoundException e) {
+									e.printStackTrace();
+								}
+							} else{
+								freqreads = new ArrayList<FreqRead>(); //Empty ArrayList
+							}
+					    	freqreads.add(new FreqRead(currFreqVal, input.getText().toString()));
+					    	adapter.getList().add(new FreqRead(currFreqVal, input.getText().toString()));
+					    	adapter.notifyDataSetChanged();
+					    	
+					    	File folder = new File(getActivity().getApplicationContext().getFilesDir() + "/SaveData");
+							if (!folder.exists())
+								folder.mkdir();
+							File newfile = new File(folder.getAbsolutePath() + "/freqreads.txt");
+							try {
+								if (newfile.exists())
+									newfile.delete();
+								newfile.createNewFile();
+								
+								ObjectOutputStream outputStream = new ObjectOutputStream(new FileOutputStream(newfile));
+								outputStream.writeObject(freqreads);
+								
+								outputStream.flush();
+								outputStream.close();
+							} catch (FileNotFoundException e) {
+								e.printStackTrace();
+							} catch (IOException e) {
+								e.printStackTrace();
+							}
+					    }
+					});
+					builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+					    @Override
+					    public void onClick(DialogInterface dialog, int which) {
+					        dialog.cancel();
+					    }
+					});
+					builder.show();
+				}
+			});
+			
 			deltaFreqView = (TextView) rootView.findViewById(R.id.deltaFrequencyDetailView);
 			numColView = (TextView) rootView.findViewById(R.id.outputInfoDetailView);
 			currNoiseView = (TextView) rootView.findViewById(R.id.currNoiseLevelDetailView);
 			currThresholdView = (TextView) rootView.findViewById(R.id.currThresholdDetailView);
-			
-			settingsButton= (Button) rootView.findViewById(R.id.settings_button);
-			settingsButton.setOnClickListener(new OnClickListener(){
-				@Override
-				public void onClick(View v) {
-					boolean[] passIn = new boolean[1];
-					passIn[0] = displayRaw;
-					
-					FragmentManager fm = getActivity().getSupportFragmentManager();
-					DialogFragment dialog = SettingsDialogFragment.newInstance(sample_frequency, blockSize, threshold, graphRange, passIn);
-					dialog.setTargetFragment(PlaceholderFragment.this, REQUEST_SETTINGS);
-					dialog.show(fm, "Settings");
-				}
-			});
-			
-			filtersButton = (Button) rootView.findViewById(R.id.filters_button);
-			filtersButton.setOnClickListener(new OnClickListener(){
-				@Override
-				public void onClick(View v) {
-					FragmentManager fm = getActivity().getSupportFragmentManager();
-					DialogFragment dialog = FiltersDialogFragment.newInstance(bandpassLow, bandpassHigh, averagePoint,
-							((int)sample_frequency/2), ((double)sample_frequency/(double)blockSize));
-					dialog.setTargetFragment(PlaceholderFragment.this, REQUEST_FILTERS);
-					dialog.show(fm, "Filters");
-				}
-			});
 			
 			recorder = new RecordAudio(sample_frequency, blockSize);
 			recorder.execute();
@@ -418,7 +573,6 @@ public class MainActivity extends ActionBarActivity {
 				threshold = (Double)data.getSerializableExtra(SettingsDialogFragment.EXTRA_THRESHOLD_RESULT);
 				graphRange = (Double)data.getSerializableExtra(SettingsDialogFragment.EXTRA_RANGEMAX_RESULT);
 				displayRaw = ((boolean[])data.getSerializableExtra(SettingsDialogFragment.EXTRA_RAWTOGGLE_RESULT))[0];
-				updateInfoFields();
 				
 				graphView.setManualYAxisBounds(graphRange, 0);
 				graphData = new GraphViewData[nfftRes];
@@ -463,6 +617,7 @@ public class MainActivity extends ActionBarActivity {
 				
 				bandpassLow = 0;
 				bandpassHigh = sample_frequency/2;
+				updateInfoFields();
 			} else if (requestCode == REQUEST_FILTERS){
 				double lowResult = (Double)data.getSerializableExtra(FiltersDialogFragment.EXTRA_LOWERBOUND_RESULT);
 				double highResult = (Double)data.getSerializableExtra(FiltersDialogFragment.EXTRA_UPPERBOUND_RESULT);
@@ -554,7 +709,8 @@ public class MainActivity extends ActionBarActivity {
 			int entries = toTransform[0].length;
 			double total = 0;
 			for(int i=0; i<entries; i++){
-				total += toTransform[0][i];
+				if (toTransform[0][i]>0)
+					total += toTransform[0][i];
 			}
 			return total/(double)entries;
 		}
@@ -637,6 +793,77 @@ public class MainActivity extends ActionBarActivity {
 			}
 			return res;
 		}
+		
+		public class FreqReadAdapter extends ArrayAdapter<FreqRead>{
+			private ArrayList<FreqRead> list;
+			
+			public FreqReadAdapter(ArrayList<FreqRead> freqreads){
+				super(getActivity(),0,freqreads);
+				list = freqreads;
+			}
+			
+			@Override
+			public void remove(FreqRead item){
+				super.remove(item);
+				list.remove(item);
+			}
+			
+			@Override
+			public View getView(int position, View convertView, ViewGroup parent){
+				if(convertView == null || convertView.getTag() != (Integer)position){
+					convertView = getActivity().getLayoutInflater().inflate(R.layout.freqread_display_list_layout, parent, false);
+					convertView.setTag((Integer) position);
+				}
+				
+				FreqRead fr = getItem(position);
+				
+				ImageView freq = (ImageView) convertView.findViewById(R.id.searchImageView);
+				switch(fr.flag){
+				case 0:freq.setBackgroundResource(R.color.green);
+					break;
+				case 1:freq.setBackgroundResource(R.color.orange);
+					break;
+				case 2:freq.setBackgroundResource(R.color.red);
+					break;
+				}
+				
+				TextView freqname = (TextView) convertView.findViewById(R.id.freqNameTextView);
+				freqname.setText(fr.frequencyName);
+			
+				return convertView;
+			}
+			
+			public ArrayList<FreqRead> getList() {
+		        return list;
+		    }
+		}
 	}
 
+	@Override
+	public void setupFragment(int position) {
+		FragmentManager fm = getSupportFragmentManager();
+		DialogFragment dialog = null;
+		if (excelWriteFlag)
+			return;
+		
+		switch (position){
+		case 0:boolean[] passIn = new boolean[1];
+				passIn[0] = displayRaw;
+				fm = getSupportFragmentManager();
+				dialog = SettingsDialogFragment.newInstance(sample_frequency, blockSize, threshold, graphRange, passIn);
+				dialog.setTargetFragment(fragment, REQUEST_SETTINGS);
+				dialog.show(fm, "Settings");
+				break;
+		case 1: fm = getSupportFragmentManager();
+				dialog = FiltersDialogFragment.newInstance(bandpassLow, bandpassHigh, averagePoint,
+				((int)sample_frequency/2), ((double)sample_frequency/(double)blockSize));
+				dialog.setTargetFragment(fragment, REQUEST_FILTERS);
+				dialog.show(fm, "Filters");
+				break;
+		case 2: fm = getSupportFragmentManager();
+				dialog = new FreqReadFragment();
+				dialog.show(fm, "Filters");
+				break;
+		}
+	}
 }

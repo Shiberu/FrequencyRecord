@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/fav_video_relative_layout"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content" >
+
+    <TextView
+        android:id="@+id/freqNameTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerVertical="true"
+        android:layout_toRightOf="@id/searchImageView"
+        android:paddingLeft="5dp"
+        android:paddingRight="5dp"
+        android:text="@string/hello_world"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:textSize="18sp" />
+
+    <ImageView
+        android:id="@+id/searchImageView"
+        android:layout_width="20dp"
+        android:layout_height="10dp"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentTop="true"
+        android:layout_centerVertical="true"
+        android:layout_marginBottom="10dp"
+        android:layout_marginLeft="10dp"
+        android:layout_marginRight="5dp"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/circle" />
+
+</RelativeLayout>

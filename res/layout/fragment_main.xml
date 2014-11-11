@@ -15,24 +15,39 @@
         android:id="@+id/frequencyView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="2dp"
         android:gravity="center"
         android:text="@string/frequency_Default"
         android:textAppearance="?android:attr/textAppearanceLarge" />
 
-    <ToggleButton
-        android:id="@+id/recordToggleButton"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:textOff="@string/toggle_off"
-        android:textOn="@string/toggle_on" />
+        android:gravity="center" >
+
+        <ToggleButton
+            android:id="@+id/recordToggleButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginRight="10dp"
+            android:textOff="@string/toggle_off"
+            android:textOn="@string/toggle_on" />
+
+        <Button
+            android:id="@+id/frequencyRecordButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="10dp"
+            android:text="@string/mark_frequency"
+            android:textSize="15sp" />
+
+    </LinearLayout>
 
     <LinearLayout
         android:id="@+id/graphViewLayout"
         android:layout_width="match_parent"
-        android:layout_height="290dp"
-        android:layout_marginTop="10dp"
+        android:layout_height="250dp"
+        android:layout_marginTop="5dp"
         android:background="#000000"
         android:orientation="vertical" >
 
@@ -43,7 +58,7 @@
         android:layout_height="wrap_content" >
 
         <LinearLayout
-            android:id="@+id/linearLayout1"
+            android:id="@+id/infoLayout"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="vertical" >
@@ -55,8 +70,8 @@
 
                 <TextView
                     android:id="@+id/deltaFrequencyDescView"
-                    android:layout_width="150dp"
-                    android:layout_height="wrap_content"
+                    android:layout_width="120dp"
+                    android:layout_height="35dp"
                     android:text="@string/delta_frequency_desc_view"
                     android:textStyle="bold" />
 
@@ -75,8 +90,8 @@
 
                 <TextView
                     android:id="@+id/outputInfoDescView"
-                    android:layout_width="150dp"
-                    android:layout_height="wrap_content"
+                    android:layout_width="120dp"
+                    android:layout_height="35dp"
                     android:text="@string/output_info_desc_view"
                     android:textStyle="bold" />
 
@@ -95,8 +110,8 @@
 
                 <TextView
                     android:id="@+id/currNoiseLevelView"
-                    android:layout_width="150dp"
-                    android:layout_height="wrap_content"
+                    android:layout_width="120dp"
+                    android:layout_height="35dp"
                     android:text="@string/curr_noise_desc_view"
                     android:textStyle="bold" />
 
@@ -115,8 +130,8 @@
 
                 <TextView
                     android:id="@+id/currThresholdView"
-                    android:layout_width="150dp"
-                    android:layout_height="wrap_content"
+                    android:layout_width="120dp"
+                    android:layout_height="35dp"
                     android:text="@string/curr_threshold_view"
                     android:textStyle="bold" />
 
@@ -129,31 +144,16 @@
             </LinearLayout>
         </LinearLayout>
 
-        <Button
-            android:id="@+id/settings_button"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:layout_alignParentEnd="true"
-            android:layout_alignParentRight="true"
-            android:layout_alignParentTop="true"
-            android:layout_marginEnd="20dp"
-            android:layout_marginRight="20dp"
-            android:layout_marginTop="5dp"
-            android:text="@string/settings_text_button" />
-        
-         <Button
-             android:id="@+id/filters_button"
-             android:layout_width="wrap_content"
-             android:layout_height="40dp"
-             android:layout_alignLeft="@id/settings_button"
-             android:layout_alignParentEnd="true"
-             android:layout_alignParentRight="true"
-             android:layout_alignParentTop="false"
-             android:layout_below="@id/settings_button"
-             android:layout_marginEnd="20dp"
-             android:layout_marginRight="20dp"
-             android:layout_marginTop="3dp"
-             android:text="@string/filters_text_button" />
+        <ListView
+            android:id="@+id/frequencyListView"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="3dp"
+            android:layout_marginStart="3dp"
+            android:layout_toEndOf="@id/infoLayout"
+            android:layout_toRightOf="@id/infoLayout" >
+
+        </ListView>
 
     </RelativeLayout>
 

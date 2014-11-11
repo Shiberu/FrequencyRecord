@@ -31,7 +31,19 @@
 	<string name="point_average_filter_upper_text_view"> Upper Bound </string>
 	<string name="lower_default"> 0 </string>
 	<string name="upper_default"> 4000 </string>
+	<string name="mark_frequency"> Mark Frequency </string>
     
+	<string-array name="nav_drawer_items">
+        <item>Settings</item>
+        <item>Filters</item>
+        <item>Target Frequencies</item>
+    </string-array>
+    
+	<array name="nav_drawer_icons">
+        <item>@drawable/ic_action_settings</item>   
+        <item>@drawable/ic_action_search</item>   
+        <item>@drawable/ic_action_volume_on</item>
+    </array>
 	
 	<string-array name="frequency_array">
         <item>8000 Hz</item>
